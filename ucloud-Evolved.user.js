@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         ucloud-Evolved
 // @namespace    http://tampermonkey.net/
-// @version      0.36
+// @version      0.37
 // @description  主页作业显示所属课程，使用Office 365预览课件，增加通知显示数量，通知按时间排序，去除悬浮窗，解除复制限制，课件自动下载，批量下载，资源页展示全部下载按钮，更好的页面标题
 // @author       Quarix
 // @match        https://ucloud.bupt.edu.cn/*
@@ -168,31 +168,49 @@
       );
     }
   }
+  let originalWebpackJsonp = unsafeWindow.webpackJsonp;
   let webpackJsonp_ = undefined;
+
+  function hookWebpackFunction(originalFunc) {
+    return function (chunkIds, modules, ...rest) {
+      patchModules(modules);
+      return originalFunc.apply(this, [chunkIds, modules, ...rest]);
+    };
+  }
+
+  function hookWebpackArray(array) {
+    array.forEach((chunk) => patchModules(chunk[1]));
+    const originalPush = array.push;
+    array.push = function (...args) {
+      const chunk = args[0];
+      if (chunk && chunk[1]) {
+        patchModules(chunk[1]);
+      }
+      return originalPush.apply(this, args);
+    };
+    return array;
+  }
+
+  if (typeof originalWebpackJsonp === "function") {
+    webpackJsonp_ = hookWebpackFunction(originalWebpackJsonp);
+  } else if (Array.isArray(originalWebpackJsonp)) {
+    webpackJsonp_ = hookWebpackArray(originalWebpackJsonp);
+  } else {
+    webpackJsonp_ = originalWebpackJsonp;
+  }
+
   Object.defineProperty(unsafeWindow, "webpackJsonp", {
     configurable: true,
     enumerable: true,
-
     get() {
       return webpackJsonp_;
     },
-
     set(newValue) {
-      console.log("[Hook Script] `webpackJsonp` assignment captured.");
+      console.log("[ucloud-Evolved] `webpackJsonp` assignment captured.");
       if (Array.isArray(newValue)) {
-        newValue.forEach((chunk) => patchModules(chunk[1]));
-        const originalPush = newValue.push;
-        newValue.push = function (...args) {
-          const chunk = args[0];
-          patchModules(chunk[1]);
-          return originalPush.apply(this, args);
-        };
-        webpackJsonp_ = newValue;
+        webpackJsonp_ = hookWebpackArray(newValue);
       } else if (typeof newValue === "function") {
-        webpackJsonp_ = function (chunkIds, modules, ...rest) {
-          patchModules(modules);
-          return newValue.call(this, chunkIds, modules, ...rest);
-        };
+        webpackJsonp_ = hookWebpackFunction(newValue);
       } else {
         webpackJsonp_ = newValue;
       }
