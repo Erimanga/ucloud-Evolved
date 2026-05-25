@@ -2941,14 +2941,17 @@
                     const totalCount = resources.length;
                     let completedCount = 0;
                     btn.innerHTML = "取消下载 (0/" + totalCount + ")";
-                    for (let file of resources) {
+                    for (let index = 0; index < resources.length; index++) {
                       if (!downloading) return;
+                      const file = resources[index];
                       const shortName = file.name.length > 20 ? file.name.substring(0, 17) + "..." : file.name;
-                      btn.innerHTML = "取消下载 " + shortName + " (" + completedCount + "/" + totalCount + ")";
+                      btn.innerHTML =
+                        "取消下载 " + shortName + " (" + (index + 1) + "/" + totalCount + ")";
                       await downloadFile(
                         await getPreviewURL(file.id),
                         file.name
                       );
+                      if (!downloading) return;
                       completedCount++;
                     }
                     if (downloading) {
